@@ -301,33 +301,75 @@ def edit_student_page():
     df["student_id"] = df["student_id"].astype(str)
     st.dataframe(df)
 
+import pandas as pd
+
 def add_student_page():
     st.subheader("Add Student Data")
-    # Add new student fields
-    student_id = st.text_input('Student ID')
-    first_name = st.text_input('First Name')
-    last_name = st.text_input('Last Name')
-    email = st.text_input('Email')
-    contact_number = st.text_input('Contact Number')
-    address = st.text_area('Address')
+    
+    # Option to add students manually or via CSV
+    add_option = st.radio("Add Students", options=["Manually", "Upload CSV"], index=0)
+    
+    if add_option == "Manually":
+        # Add new student fields
+        student_id = st.text_input('Student ID')
+        first_name = st.text_input('First Name')
+        last_name = st.text_input('Last Name')
+        email = st.text_input('Email')
+        contact_number = st.text_input('Contact Number')
+        address = st.text_area('Address')
 
-    if st.button('Add Student'):
-        # Add student to the database
-        register_date = today()
+        if st.button('Add Student'):
+            register_date = today()  # Get the current date
+            conn = create_connection()
+            cursor = conn.cursor()
+            query = '''
+            INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            '''
+            cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
+            conn.commit()
+            close_connection(conn)
 
-        # Add student to the database
-        conn = create_connection()
-        cursor = conn.cursor()
+            st.success("New student added successfully!")
+    
+    elif add_option == "Upload CSV":
+        # File uploader for CSV
+        uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+        
+        if uploaded_file:
+            # Read the uploaded CSV file
+            csv_data = pd.read_csv(uploaded_file)
+            
+            # Display the CSV data for confirmation
+            st.write("Preview of uploaded data:")
+            st.dataframe(csv_data)
 
-        query = '''
-        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        '''
-        cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
-        conn.commit()
-        close_connection(conn)
+            # Check if required columns exist
+            required_columns = ['student_id', 'first_name', 'last_name', 'email', 'contact_number', 'address']
+            if all(col in csv_data.columns for col in required_columns):
+                if st.button('Add Students from CSV'):
+                    # Add students to the database
+                    conn = create_connection()
+                    cursor = conn.cursor()
+                    register_date = today()
+                    
+                    for _, row in csv_data.iterrows():
+                        query = '''
+                        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        '''
+                        cursor.execute(query, (
+                            row['student_id'], row['first_name'], row['last_name'], 
+                            row['email'], row['contact_number'], row['address'], register_date
+                        ))
+                    
+                    conn.commit()
+                    close_connection(conn)
 
-        st.success("New student added successfully!")
+                    st.success("All students from the CSV file have been added successfully!")
+            else:
+                st.error(f"CSV file must include the following columns: {', '.join(required_columns)}")
+
 
 def delete_student_page():
     st.subheader("Delete Student Data")
