@@ -1,0 +1,43 @@
+df = show_table("enrollment","*")
+
+            # Connect to the database (replace with your database connection details)
+
+            # Select a row by student_id
+            selected_row1 = st.selectbox('Select a Student ID', df['student_id'])
+
+            # Filter DataFrame based on selected student_id
+            filtered_df = df[df['student_id'] == selected_row1]
+
+            # Select a row by course_id based on the filtered student_id
+            selected_row2 = st.selectbox('Select a Course', df['course_id'])
+
+            # Get the row data for the selected student and course
+            selected_data = filtered_df[filtered_df['course_id'] == selected_row2].iloc[0]
+
+            # Edit values with inputs
+            semester_edit = st.text_input('Semester', selected_data['semester'])
+            year_edit = st.number_input('Year', value=selected_data['year'], step=1)
+            grade_edit = st.text_input('Grade', selected_data['grade'])
+
+        
+
+
+            # Update the Database
+            if st.button('Save Changes'):
+                # SQL query to update the database
+                query = '''
+                UPDATE enrollment
+                SET semester = ?, year = ?, grade = ?
+                WHERE student_id = ? AND course_id = ?
+                '''
+                cursor.execute(query, (semester_edit, year_edit, grade_edit, selected_row1, selected_row2))
+                conn.commit()
+
+                st.success("Changes saved to the database successfully!")
+
+                # Reload updated data
+                df = pd.read_sql_query("SELECT * FROM enrollment", conn)
+                st.write("Updated DataFrame:")
+                st.dataframe(df)
+            st.dataframe(df)
+                
