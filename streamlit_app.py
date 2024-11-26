@@ -1028,13 +1028,13 @@ if __name__ == "__main__":
     main()
 
 #========================================
-# Test Database Connection
-# st.write("TEST Connection") 
-# conn = create_connection()
-# if conn:
-#     st.write("Connected to MySQL database")
-#     cursor = conn.cursor()
-# else:
-#     st.error("Failed to connect to the database.")
-# st.write("Session State:", st.session_state)
-# close_connection(conn)
+Test Database Connection
+st.write("TEST Connection") 
+conn = create_connection()
+if conn:
+    st.write("Connected to MySQL database")
+    cursor = conn.cursor()
+else:
+    st.error("Failed to connect to the database.")
+st.write("Session State:", st.session_state)
+close_connection(conn)
