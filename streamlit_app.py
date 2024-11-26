@@ -38,16 +38,16 @@ def try_login(input_username, input_password):
     conn = create_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT password FROM student_login WHERE student_id = %s ", (input_username,))
+    cursor.execute("SELECT password_hash FROM admin WHERE username = %s ", (input_username,))
     result = cursor.fetchone()
     if result:
         stored_password = result[0]  # Get the stored password
-        # if hash_password(input_password) == stored_password:
-        if input_password == stored_password:
+        if hash_password(input_password) == stored_password:
+        # if input_password == stored_password:
             st.session_state.logged_in = True  # Set login state to True
             st.success("Logged in!")
-            sleep(1)
-            # st.experimental_rerun()  # Rerun the app to show the sidebar
+            # sleep(1)
+            st.rerun()  # Rerun the app to show the sidebar
         else:
             st.error("Your username or password is incorrect")
     else:
@@ -319,14 +319,25 @@ def add_student_page():
         address = st.text_area('Address')
 
         if st.button('Add Student'):
-            register_date = today()  # Get the current date
+            # Get the current date
+            register_date = today() 
+            created_at = today() 
+
             conn = create_connection()
             cursor = conn.cursor()
+
             query = '''
             INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             '''
             cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
+
+            login_query = '''
+            INSERT INTO student_login (student_id,password,created_at)
+            VALUES (%s, %s, %s)
+            '''
+            cursor.execute(login_query, (student_id, student_id,created_at))
+            
             conn.commit()
             close_connection(conn)
 
@@ -676,7 +687,125 @@ def delete_enrollment_page():
         close_connection(conn)
 
         st.success(f"Enrollment with ID {selected_row1} deleted successfully!")
+# ====================================
+def instructor_management_page():
+    st.title("Instructor Management")
 
+    # Use st.tabs to create tabs
+    tabs = st.tabs(["Edit Instructor Data", "Add Instructor Data", "Delete Instructor Data"])
+
+    with tabs[0]:
+        edit_instructor_page()
+
+    with tabs[1]:
+        add_instructor_page()
+
+    with tabs[2]:
+        delete_instructor_page()
+
+
+def edit_instructor_page():
+    st.subheader("Edit Instructor Data")
+    df = show_table("instructor", "*")  # Fetch data from the instructor table
+    selected_instructor = st.selectbox('Select an Instructor ID', df['instructor_id'])
+
+    # Get the selected instructor's data
+    selected_data = df[df['instructor_id'] == selected_instructor].iloc[0]
+
+    # Edit values with inputs
+    first_name_edit = st.text_input('First Name', selected_data['first_name'])
+    last_name_edit = st.text_input('Last Name', selected_data['last_name'])
+    department_id_edit = st.text_input('Department ID', str(selected_data['department_id']))
+    email_edit = st.text_input('Email', selected_data['email'])
+    contact_number_edit = st.text_input('Contact Number', selected_data['contact_number'])
+
+    if st.button('Save Changes'):
+        conn = create_connection()
+        cursor = conn.cursor()
+
+        query = '''
+        UPDATE instructor
+        SET first_name = %s, last_name = %s, department_id = %s, email = %s, contact_number = %s
+        WHERE instructor_id = %s
+        '''
+        cursor.execute(query, (first_name_edit, last_name_edit, department_id_edit, email_edit, contact_number_edit, selected_instructor))
+        conn.commit()
+        close_connection(conn)
+
+        st.success("Instructor details updated successfully!")
+        # Reload updated data
+        df = show_table("instructor", "*")
+    st.dataframe(df)
+
+
+def add_instructor_page():
+    st.subheader("Add Instructor Data")
+
+    # Fetch department data from the department table
+    department_df = show_table("department", "department_id, department_name")  # Assuming this fetches department_id and department_name
+
+    # Combine department_id and department_name for display in the selectbox
+    department_options = department_df.apply(lambda x: f"{x['department_id']}-{x['department_name']}", axis=1).tolist()
+
+    # Add new instructor fields
+    instructor_id = st.text_input('Instructor ID')
+    first_name = st.text_input('First Name')
+    last_name = st.text_input('Last Name')
+    selected_department = st.selectbox('Select Department', department_options)
+    email = st.text_input('Email')
+    contact_number = st.text_input('Contact Number')
+
+    # Extract department_id from the selected value
+    department_id = selected_department.split('-')[0]
+
+    if st.button('Add Instructor'):
+        conn = create_connection()
+        cursor = conn.cursor()
+
+        query = '''
+        INSERT INTO instructor (instructor_id, first_name, last_name, department_id, email, contact_number)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        '''
+        cursor.execute(query, (instructor_id, first_name, last_name, department_id, email, contact_number))
+        conn.commit()
+        close_connection(conn)
+
+        st.success(f"New instructor with ID {instructor_id} added successfully!")
+
+
+def delete_instructor_page():
+    st.subheader("Delete Instructor Data")
+
+    # Fetch the instructor data from the database
+    df = show_table("instructor", "*")
+
+    # Create a selectbox to choose an instructor ID
+    selected_instructor = st.selectbox('Select an Instructor ID to Delete', df['instructor_id'])
+
+    # Get the selected instructor's data
+    selected_data = df[df['instructor_id'] == selected_instructor].iloc[0]  # Fetch the row data
+
+    # Display the details of the selected instructor
+    st.dataframe(selected_data)
+
+    # Ask for confirmation before deletion
+    confirm_delete = st.button('Confirm Deletion')
+
+    if confirm_delete:
+        # Proceed with deletion if confirmed
+        conn = create_connection()
+        cursor = conn.cursor()
+
+        delete_query = '''
+        DELETE FROM instructor WHERE instructor_id = %s
+        '''
+        cursor.execute(delete_query, (selected_instructor,))
+        conn.commit()
+        close_connection(conn)
+
+        st.success(f"Instructor with ID {selected_instructor} deleted successfully!")
+
+# ====================================
 def report_page():
     st.title("University Report Page")
 
@@ -835,6 +964,7 @@ def setting_page():
         # Clear session state and redirect to login page
         st.session_state.clear()
         st.session_state['current_page'] = "Login"
+        st.rerun()
     
 #========================================
 # Main
@@ -862,15 +992,17 @@ def main():
         with st.sidebar:
             selected_option = option_menu(
                 menu_title="Navigation",
-                options=["Dashboard", "Student Management", "Course Management","Enrollment Management", "Reports", "Settings"],
-                icons=["house", "person", "book", "clipboard-check", "bar-chart", "gear"],
+                options=["Dashboard", "Student Management", "Enrollment Management", "Course Management", 
+                         "Instructor Management", "Reports", "Settings"],
+                icons=["house", "person", "clipboard-check", "book", "person", "bar-chart", "gear"],
                 menu_icon="cast",
                 default_index=0,
-            )
+                )
+
             if selected_option == "Logout":
                 st.session_state.clear()
                 st.session_state['current_page'] = "Login"
-                st.rerun
+                st.rerun()
             else:
                 st.session_state['current_page'] = selected_option
 
@@ -883,6 +1015,8 @@ def main():
             course_management_page()
         elif st.session_state["current_page"] == "Enrollment Management":
             enrollment_management_page()
+        elif st.session_state["current_page"] == "Instructor Management":
+            instructor_management_page()
         elif st.session_state["current_page"] == "Reports":
             report_page()
         elif st.session_state["current_page"] == "Settings":
