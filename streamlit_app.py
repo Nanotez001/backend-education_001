@@ -1028,7 +1028,7 @@ if __name__ == "__main__":
     main()
 
 #========================================
-Test Database Connection
+# Test Database Connection
 st.write("TEST Connection") 
 conn = create_connection()
 if conn:
