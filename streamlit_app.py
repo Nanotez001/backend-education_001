@@ -442,17 +442,54 @@ def course_management_page():
 # Edit Course Page
 def edit_course_page():
     st.subheader("Edit Course Data")
-    df = show_table("course", "*")  # Fetch course data from the database
-    selected_row1 = st.selectbox('Select a Course ID', df['course_id'])
+    
+    # Fetch data for courses, departments, and instructors
+    course_df = show_table("course", "*")  # Fetch course data from the database
+    department_df = show_table("department", "*")  # Fetch department data
+    instructor_df = show_table("instructor", "*")  # Fetch instructor data
 
-    selected_data = df[df['course_id'] == selected_row1].iloc[0]
+    # Create descriptive labels for courses
+    course_options = course_df.apply(
+        lambda row: f"{row['course_id']}-{row['course_name']}", axis=1
+    )
+    course_mapping = {f"{row['course_id']}-{row['course_name']}": row['course_id'] for _, row in course_df.iterrows()}
+
+    # Create descriptive labels for departments and instructors
+    department_options = department_df.apply(
+        lambda row: f"{row['department_id']}-{row['department_name']}", axis=1
+    )
+    instructor_options = instructor_df.apply(
+        lambda row: f"{row['instructor_id']}-{row['first_name']} {row['last_name']}", axis=1
+    )
+
+    # Map descriptive labels to their actual IDs for processing
+    department_mapping = {f"{row['department_id']}-{row['department_name']}": row['department_id'] for _, row in department_df.iterrows()}
+    instructor_mapping = {f"{row['instructor_id']}-{row['first_name']} {row['last_name']}": row['instructor_id'] for _, row in instructor_df.iterrows()}
+
+    # Select a course by descriptive label
+    selected_course_label = st.selectbox('Select a Course', course_options)
+    selected_course = course_mapping[selected_course_label]
+    selected_data = course_df[course_df['course_id'] == selected_course].iloc[0]
 
     # Edit values with inputs
     course_name_edit = st.text_input('Course Name', selected_data['course_name'])
     credits_edit = st.number_input('Credits', value=selected_data['credits'], step=1)
-    department_id_edit = st.text_input('Department ID', selected_data['department_id'])
-    instructor_id_edit = st.text_input('Instructor ID', selected_data['instructor_id'])
 
+    # Select department using descriptive labels
+    current_department_label = f"{selected_data['department_id']}-{department_df[department_df['department_id'] == selected_data['department_id']]['department_name'].values[0]}"
+    department_id_label_edit = st.selectbox(
+        'Department', department_options, index=department_options.tolist().index(current_department_label)
+    )
+    department_id_edit = department_mapping[department_id_label_edit]  # Get the actual department ID
+
+    # Select instructor using descriptive labels
+    current_instructor_label = f"{selected_data['instructor_id']}-{instructor_df[instructor_df['instructor_id'] == selected_data['instructor_id']]['first_name'].values[0]} {instructor_df[instructor_df['instructor_id'] == selected_data['instructor_id']]['last_name'].values[0]}"
+    instructor_id_label_edit = st.selectbox(
+        'Instructor', instructor_options, index=instructor_options.tolist().index(current_instructor_label)
+    )
+    instructor_id_edit = instructor_mapping[instructor_id_label_edit]  # Get the actual instructor ID
+
+    # Save changes to the database
     if st.button('Save Changes'):
         conn = create_connection()
         cursor = conn.cursor()
@@ -462,17 +499,23 @@ def edit_course_page():
         SET course_name = %s, credits = %s, department_id = %s, instructor_id = %s
         WHERE course_id = %s
         '''
-        cursor.execute(query, (course_name_edit, credits_edit, department_id_edit, instructor_id_edit, selected_row1))
+        cursor.execute(
+            query,
+            (course_name_edit, credits_edit, department_id_edit, instructor_id_edit, selected_course)
+        )
         conn.commit()
         close_connection(conn)
 
         st.success("Course details updated successfully!")
 
         # Reload updated data
-        df = show_table("course", "*")
-    df["course_id"] = df["course_id"].astype(str)
-    df["instructor_id"] = df["instructor_id"].astype(str)
-    st.dataframe(df)
+        course_df = show_table("course", "*")
+    
+    # Display the updated course table
+    course_df["course_id"] = course_df["course_id"].astype(str)
+    course_df["instructor_id"] = course_df["instructor_id"].astype(str)
+    st.dataframe(course_df)
+
 
 # Add Course Page
 def add_course_page():
@@ -706,19 +749,45 @@ def instructor_management_page():
 
 def edit_instructor_page():
     st.subheader("Edit Instructor Data")
-    df = show_table("instructor", "*")  # Fetch data from the instructor table
-    selected_instructor = st.selectbox('Select an Instructor ID', df['instructor_id'])
+    
+    # Fetch data for instructors and departments
+    instructor_df = show_table("instructor", "*")  # Fetch data from the instructor table
+    department_df = show_table("department", "*")  # Fetch data from the department table
+
+    # Create descriptive labels for instructors and departments
+    instructor_options = instructor_df.apply(
+        lambda row: f"{row['instructor_id']}-{row['first_name']} {row['last_name']}", axis=1
+    )
+    department_options = department_df.apply(
+        lambda row: f"{row['department_id']}-{row['department_name']}", axis=1
+    )
+
+    # Map descriptive labels to their actual IDs for processing
+    instructor_mapping = {f"{row['instructor_id']}-{row['first_name']} {row['last_name']}": row['instructor_id'] for _, row in instructor_df.iterrows()}
+    department_mapping = {f"{row['department_id']}-{row['department_name']}": row['department_id'] for _, row in department_df.iterrows()}
+
+    # Select an instructor by ID
+    selected_instructor_label = st.selectbox('Select an Instructor', instructor_options)
+    selected_instructor = instructor_mapping[selected_instructor_label]  # Get the actual instructor ID
 
     # Get the selected instructor's data
-    selected_data = df[df['instructor_id'] == selected_instructor].iloc[0]
+    selected_data = instructor_df[instructor_df['instructor_id'] == selected_instructor].iloc[0]
 
-    # Edit values with inputs
+    # Populate fields with current data
     first_name_edit = st.text_input('First Name', selected_data['first_name'])
     last_name_edit = st.text_input('Last Name', selected_data['last_name'])
-    department_id_edit = st.text_input('Department ID', str(selected_data['department_id']))
+
+    # Select department using descriptive labels
+    current_department_label = f"{selected_data['department_id']}-{department_df[department_df['department_id'] == selected_data['department_id']]['department_name'].values[0]}"
+    department_id_label_edit = st.selectbox(
+        'Department', department_options, index=department_options.tolist().index(current_department_label)
+    )
+    department_id_edit = department_mapping[department_id_label_edit]  # Get the actual department ID
+
     email_edit = st.text_input('Email', selected_data['email'])
     contact_number_edit = st.text_input('Contact Number', selected_data['contact_number'])
 
+    # Save changes to the database
     if st.button('Save Changes'):
         conn = create_connection()
         cursor = conn.cursor()
@@ -728,14 +797,20 @@ def edit_instructor_page():
         SET first_name = %s, last_name = %s, department_id = %s, email = %s, contact_number = %s
         WHERE instructor_id = %s
         '''
-        cursor.execute(query, (first_name_edit, last_name_edit, department_id_edit, email_edit, contact_number_edit, selected_instructor))
+        cursor.execute(
+            query,
+            (first_name_edit, last_name_edit, department_id_edit, email_edit, contact_number_edit, selected_instructor)
+        )
         conn.commit()
         close_connection(conn)
 
         st.success("Instructor details updated successfully!")
+
         # Reload updated data
-        df = show_table("instructor", "*")
-    st.dataframe(df)
+        instructor_df = show_table("instructor", "*")
+
+    # Display the updated instructor table
+    st.dataframe(instructor_df)
 
 
 def add_instructor_page():
@@ -925,36 +1000,40 @@ def setting_page():
 
     # Add your settings options here
     st.subheader("Manage your preferences")
+    
+    toggle = st.radio("Enrollment Setting", options=["ON","OFF"], index=0)
 
     
-    toggle = st.radio("Enrollment Setting", options=["ON","OFF", "TIME SET"], index=0)
-
-    # Get the current date and time
-    current_datetime = datetime.now()
 
     if toggle == "ON":
         st.write("Enrollment ENABLE")
-    
+        # st.session_state['Enrollment state'] = "ENABLE"
+
     elif toggle == "OFF":
         st.write("Enrollment UNABLE")
-    
-    elif toggle == "TIME SET":
-        # Allow the user to set an end date and time
-        end_date = st.date_input("OFF AT")
-        end_time = st.time_input("Time")
+        # st.session_state['Enrollment state'] = "UNABLE"
 
-        # Combine the date and time selected by the user into a datetime object
-        end_datetime = datetime.combine(end_date, end_time)
+    # elif toggle == "TIME SET":
+    # # Get the current date and time
+    # current_datetime = datetime.now()
+    #     # Allow the user to set an end date and time
+    #     end_date = st.date_input("OFF AT")
+    #     end_time = st.time_input("Time")
 
-        # Show the end date and time
-        st.write(f"Enrollment will end at: {end_datetime}")
+    #     # Combine the date and time selected by the user into a datetime object
+    #     end_datetime = datetime.combine(end_date, end_time)
+
+    #     # Show the end date and time
+    #     st.write(f"Enrollment will end at: {end_datetime}")
         
-        # Check if the current date and time is past the end time
-        if current_datetime > end_datetime:
-            st.write("Enrollment UNABLE")
-        else:
-            remaining_time = end_datetime - current_datetime
-            st.write(f"Enrollment is still OPEN. Time remaining: {remaining_time}")
+    #     # Check if the current date and time is past the end time
+    #     if current_datetime > end_datetime:
+    #         st.write("Enrollment UNABLE")
+    #         st.session_state['Enrollment state'] = "UNABLE"
+    #     else:
+    #         remaining_time = end_datetime - current_datetime
+    #         st.write(f"Enrollment is still OPEN. Time remaining: {remaining_time}")
+    #         st.session_state['Enrollment state'] = "ENABLE"
         
 
 
@@ -976,7 +1055,7 @@ def main():
     # Disable sidebar during the login process
     if not st.session_state.logged_in:
         st.set_page_config(page_title="Login", layout="centered", initial_sidebar_state="collapsed")
-        st.title("SCENARY Backend.1")
+        st.title("SCENARY Backend v.5.82")
         login()
     else:
         # Enable sidebar once logged in
@@ -1021,6 +1100,8 @@ def main():
             report_page()
         elif st.session_state["current_page"] == "Settings":
             setting_page()
+        
+            
 # ==========================
 
 # Run the app
