@@ -301,42 +301,100 @@ def edit_student_page():
     df["student_id"] = df["student_id"].astype(str)
     st.dataframe(df)
 
-import pandas as pd
-
 def add_student_page():
     st.subheader("Add Student Data")
+
+    # Choose input method
+    input_method = st.radio("Choose input method:", ("Manual Entry", "Upload CSV File"))
+
+    if input_method == "Manual Entry":
+        # Manual entry fields
+        student_id = st.text_input('Student ID')
+        first_name = st.text_input('First Name')
+        last_name = st.text_input('Last Name')
+        email = st.text_input('Email')
+        contact_number = st.text_input('Contact Number')
+        address = st.text_area('Address')
+
+        if st.button('Add Student'):
+            # Get the current date
+            register_date = today() 
+            created_at = today() 
+
+            conn = create_connection()
+            cursor = conn.cursor()
+
+            query = '''
+            INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            '''
+            cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
+
+            login_query = '''
+            INSERT INTO student_login (student_id, password, created_at)
+            VALUES (%s, %s, %s)
+            '''
+            cursor.execute(login_query, (student_id, student_id, created_at))
+            
+            conn.commit()
+            close_connection(conn)
+
+            st.success("New student added successfully!")
     
-    student_id = st.text_input('Student ID')
-    first_name = st.text_input('First Name')
-    last_name = st.text_input('Last Name')
-    email = st.text_input('Email')
-    contact_number = st.text_input('Contact Number')
-    address = st.text_area('Address')
+    elif input_method == "Upload CSV File":
+        # CSV upload and processing
+        uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+        if uploaded_file:
+            try:
+                # Read the CSV file
+                df = pd.read_csv(uploaded_file)
 
-    if st.button('Add Student'):
-        # Get the current date
-        register_date = today() 
-        created_at = today() 
+                # Ensure the required columns are present
+                required_columns = {"student_id", "first_name", "last_name", "email", "contact_number", "address","faculty_name"}
+                if not required_columns.issubset(set(df.columns)):
+                    st.error("CSV file is missing one or more required columns.")
+                    return
 
-        conn = create_connection()
-        cursor = conn.cursor()
+                st.write("Preview of uploaded data:")
+                st.dataframe(df)
 
-        query = '''
-        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        '''
-        cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
+                if st.button("Add Students from CSV"):
+                    conn = create_connection()
+                    cursor = conn.cursor()
 
-        login_query = '''
-        INSERT INTO student_login (student_id,password,created_at)
-        VALUES (%s, %s, %s)
-        '''
-        cursor.execute(login_query, (student_id, student_id,created_at))
-        
-        conn.commit()
-        close_connection(conn)
+                    # Insert each row into the database
+                    for _, row in df.iterrows():
+                        register_date = today()
+                        created_at = today()
+                        
+                        query = '''
+                        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address,faculty_name,register_date)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        '''
+                        cursor.execute(query, (
+                            row['student_id'], 
+                            row['first_name'], 
+                            row['last_name'], 
+                            row['email'], 
+                            row['contact_number'], 
+                            row['address'],
+                            row['faculty_name'],
+                            register_date
+                        ))
 
-        st.success("New student added successfully!")
+                        login_query = '''
+                        INSERT INTO student_login (student_id, password)
+                        VALUES (%s, %s, %s)
+                        '''
+                        cursor.execute(login_query, (row['student_id'], row['student_id']))
+                    
+                    conn.commit()
+                    close_connection(conn)
+
+                    st.success("Students added successfully from CSV file!")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+
 
 
 def delete_student_page():
