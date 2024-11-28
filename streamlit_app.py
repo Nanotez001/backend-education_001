@@ -312,6 +312,7 @@ def add_student_page():
         student_id = st.text_input('Student ID')
         first_name = st.text_input('First Name')
         last_name = st.text_input('Last Name')
+        faculty_name = st.text_input('faculty_name')
         email = st.text_input('Email')
         contact_number = st.text_input('Contact Number')
         address = st.text_area('Address')
@@ -319,22 +320,21 @@ def add_student_page():
         if st.button('Add Student'):
             # Get the current date
             register_date = today() 
-            created_at = today() 
 
             conn = create_connection()
             cursor = conn.cursor()
 
             query = '''
-            INSERT INTO student (student_id, first_name, last_name, email, contact_number, address, register_date)
+            INSERT INTO student (student_id, first_name, last_name, email, contact_number, address,"faculty_name", register_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             '''
-            cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address, register_date))
+            cursor.execute(query, (student_id, first_name, last_name, email, contact_number, address,faculty_name, register_date))
 
             login_query = '''
-            INSERT INTO student_login (student_id, password, created_at)
+            INSERT INTO student_login (student_id, password)
             VALUES (%s, %s, %s)
             '''
-            cursor.execute(login_query, (student_id, student_id, created_at))
+            cursor.execute(login_query, (student_id, student_id))
             
             conn.commit()
             close_connection(conn)
@@ -356,19 +356,20 @@ def add_student_page():
                     return
 
                 st.write("Preview of uploaded data:")
+                df["student_id"] = df["student_id"].astype(str)
+                df["contact_number"] = df["contact_number"].astype(str)
                 st.dataframe(df)
 
                 if st.button("Add Students from CSV"):
                     conn = create_connection()
                     cursor = conn.cursor()
 
+                    register_date = today()
                     # Insert each row into the database
                     for _, row in df.iterrows():
-                        register_date = today()
-                        created_at = today()
-                        
+                    
                         query = '''
-                        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address,faculty_name,register_date)
+                        INSERT INTO student (student_id, first_name, last_name, email, contact_number, address,register_date,faculty_name)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         '''
                         cursor.execute(query, (
@@ -378,13 +379,14 @@ def add_student_page():
                             row['email'], 
                             row['contact_number'], 
                             row['address'],
-                            row['faculty_name'],
-                            register_date
+                            register_date,
+                            row['faculty_name']
+                            
                         ))
 
                         login_query = '''
                         INSERT INTO student_login (student_id, password)
-                        VALUES (%s, %s, %s)
+                        VALUES (%s, %s)
                         '''
                         cursor.execute(login_query, (row['student_id'], row['student_id']))
                     
@@ -825,6 +827,7 @@ def edit_instructor_page():
         instructor_df = show_table("instructor", "*")
 
     # Display the updated instructor table
+    instructor_df["instructor_id"]=instructor_df["instructor_id"].astype(str)
     st.dataframe(instructor_df)
 
 
